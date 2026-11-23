@@ -1,0 +1,22 @@
+Refdex
+Copyright 2026 UNun
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. A copy of the License is in the
+file LICENSE beside this one, and at http://www.apache.org/licenses/LICENSE-2.0
+
+This product bundles third-party components. Their versions, sizes and hashes are
+listed in docs/VENDOR.md; the notices they ship with are kept below and in
+ui/LICENSES/.
+
+  mermaid 11.17.2 — ui/mermaid.min.js
+      MIT. Notice in ui/LICENSES/mermaid.txt
+
+  xterm.js — ui/xterm.js, ui/xterm-addon-fit.js, ui/xterm.css
+      MIT. Notice in ui/LICENSES/xterm.txt (xterm.css also carries its own header)
+
+  vis-network 9.1.6 — ui/vis-network.min.js
+      Apache-2.0 and MIT. The file's own header carries the notice and is kept intact.
+
+  Lucide — five marks copied into ui/index.html (play, copy, check, arrow-left, folder)
+      ISC. https://github.com/lucide-icons/lucide

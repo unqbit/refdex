@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "What the window may ask the app for. Without the event permission the shell's output never reaches the terminal tab.",
+  "windows": ["main"],
+  "permissions": ["core:event:default", "core:webview:default", "core:window:default"]
+}

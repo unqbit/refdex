@@ -1,0 +1,12 @@
+# 빌드 산출물과 비밀값은 저장소에 넣지 않는다
+bin/
+target/
+*.pem
+id_*
+# 빌드가 다시 만드는 것
+src-tauri/gen/schemas/
+# 작업 도구의 결과물
+graphify-out/
+# 작업용 문서 — 공개 저장소에는 올리지 않는다
+CLAUDE.md
+QUESTIONS.md

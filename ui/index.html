@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Refdex</title>
+<style>
+/* Every colour the screen uses has a name here, and nowhere else, so the light set
+   below is the same screen with other values. The window follows the system: there is
+   no switch, because a switch would be a setting and this app keeps none. */
+:root{--bg:#111;--panel:#181818;--line:#2b2b2b;--fg:#d4d4d4;--dim:#8c8c8c;--accent:#58a6ff;
+--code:#1c1c1c;--hover:#232323;--on:#343434;--on-fg:#f0f0f0;--lit:#3d3d3d;--head:#202020;
+--ok:#8aa87a;--ok-line:#5c7a4d;--add:#1a2018;--add-fg:#8aa87a;--add-line:#5c7a4d;
+--add-mark:#3f5c33;--add-mark-fg:#e4f2dd;--del:#201a1a;--del-fg:#b08a8a;--del-line:#7a4d4d;
+--del-mark-fg:#f5e2e2;--del-mark:#5c3333;--found:#4a4120;--found-fg:#fff;
+--term-fg:#d4d4d4;--term-cursor:#58a6ff;--bad:#d58585;--diagram:dark}
+@media (prefers-color-scheme: light){
+:root{--bg:#f2f2f2;--panel:#fff;--line:#dcdcdc;--fg:#1f1f1f;--dim:#5e5e5e;--accent:#0969da;
+--code:#f0f0f0;--hover:#e8e8e8;--on:#d4d4d4;--on-fg:#121212;--lit:#e0e0e0;--head:#f4f4f4;
+--ok:#4a6b3c;--ok-line:#9cb890;--add:#edf3ea;--add-fg:#3d5c30;--add-line:#9cb890;
+--add-mark:#c9ddc0;--add-mark-fg:#1c2b16;--del:#f6eded;--del-fg:#7a3b3b;--del-line:#d4aaaa;
+--del-mark:#e8c7c7;--del-mark-fg:#3d1616;--found:#f0e0a0;--found-fg:#2b2300;
+--term-fg:#242424;--term-cursor:#0969da;--bad:#a33a3a;--diagram:default}
+}
+/* The face every place that shows code uses, and the one the pane names are set in.
+   Naming a pane is the machine's own label, not a line of the document. */
+:root{--mono:"Cascadia Mono",Consolas,"D2Coding",monospace}
+*{box-sizing:border-box}
+/* The window's own scrollbar is drawn for a page, not for panes sitting side by side:
+   it is wide, it is pale, and it does not belong to this screen. These rules dress the
+   real one rather than drawing a false one in script, because the real one already
+   carries the wheel, the keyboard, the drag and the touch, and a drawn one would have
+   to earn all four back. It rests at the panel's own tone and lifts when pointed at. */
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+/* Nothing is drawn until the pointer is in that pane. The room it takes is held all
+   the same, so showing it moves not one line of what is being read. */
+*::-webkit-scrollbar-thumb{background:transparent;border-radius:6px;
+border:2px solid transparent;background-clip:padding-box}
+#app>*:hover::-webkit-scrollbar-thumb,.tab:hover::-webkit-scrollbar-thumb,
+.md pre:hover::-webkit-scrollbar-thumb,#term:hover ::-webkit-scrollbar-thumb{
+background:var(--line);background-clip:padding-box}
+#app>*:hover::-webkit-scrollbar-thumb:hover,.tab:hover::-webkit-scrollbar-thumb:hover,
+.md pre:hover::-webkit-scrollbar-thumb:hover,#term:hover ::-webkit-scrollbar-thumb:hover{
+background:var(--dim);background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+/* An id rule with display: beats [hidden], so gate and app would both stay on screen. */
+[hidden]{display:none !important}
+/* The panes scroll inside themselves; the window never does. A scrollbar on the window
+   would mean the four panes no longer add up to it, which is a fault, not a view. */
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--fg);
+font:14px/22px "Segoe UI Variable Text","Segoe UI","Malgun Gothic",sans-serif}
+/* The document is read, not operated, so it is set in a reading face while the panes
+   around it keep the window's own. Code is one face in both places it appears. */
+.md{font-family:"Noto Serif KR","Sitka Text",Georgia,"Malgun Gothic",serif;
+font-size:15px;line-height:1.6}
+.md code,.md pre,#term{font-family:var(--mono)}
+/* The name, the one thing to press, and the line that says what to press it for sit
+   in the middle of the window. What the app is standing on is reference, not the act,
+   so it rests at the foot of the screen and leaves the middle to the door. */
+/* The pane colour, not the page colour: the bar above this screen is handed `--panel`
+   because that is what the panes show, and the door has to stand against the same
+   ground or the window has a seam across it before anything is even open. */
+#gate{height:100%;display:grid;grid-template-rows:1fr auto;justify-items:center;
+text-align:center;padding:20px 20px 24px;background:var(--panel)}
+#gate .door{display:grid;justify-items:center;gap:10px;align-content:center}
+#gate h1{margin:0;font-size:28px;letter-spacing:.02em}
+#gate button{background:var(--panel);border:1px solid var(--line);color:var(--fg);
+border-radius:6px;font:inherit;padding:7px 18px;cursor:pointer;margin-top:4px}
+#gate button:hover{border-color:var(--dim)}
+#gate p{margin:0;color:var(--dim)}
+#gate p.bad{color:var(--bad)}
+#gate p[hidden]{display:none}
+#about{display:grid;grid-template-columns:auto auto;gap:2px 14px;margin:0;
+font-size:11px;color:var(--dim);text-align:left;align-self:end}
+#about dt{text-align:right;opacity:.7}
+#about dd{margin:0}
+.hint{font-size:12px}
+/* The floors every pane keeps. The document one is the width its tables stop spilling
+   sideways at; the window's own minimum is set so all three fit at once. */
+#app{height:100%;display:grid;gap:1px;background:var(--line);position:relative;
+--c1:300px;--c2:480px;--r1:62vh;
+--min-left:160px;--min-mid:200px;--min-doc:440px;--min-row:120px;
+grid-template-columns:var(--c1) var(--c2) minmax(var(--min-doc),1fr);
+grid-template-rows:var(--r1) 1fr;
+grid-template-areas:"projects center doc" "shortcuts center doc"}
+#app>.grip{position:absolute;z-index:5;padding:0;background:transparent;overflow:visible}
+/* Everything the pointer can act on lifts to the one accent. The strip is wide enough
+   to catch, so only the line it sits over is painted: a seven-pixel slab of it would be
+   the loudest colour on the screen and the boundary is not the loudest thing here. */
+#app>.grip.v:hover{background:linear-gradient(to right,
+  transparent 3px,var(--accent) 3px,var(--accent) 4px,transparent 4px)}
+#app>.grip.h:hover{background:linear-gradient(to bottom,
+  transparent 3px,var(--accent) 3px,var(--accent) 4px,transparent 4px)}
+#app>.grip.v{width:6px;cursor:col-resize}
+#app>.grip.h{height:6px;cursor:row-resize}
+#app>*{background:var(--panel);overflow:auto;padding:12px 14px;min-width:0;min-height:0}
+#projects{grid-area:projects}
+#shortcuts{grid-area:shortcuts}
+/* The middle column shows one thing at a time. The tab names stay in sight, so
+   nothing is hidden behind a click the way a bare button would hide it. */
+#center{grid-area:center;padding:0;display:flex;flex-direction:column;min-width:0}
+#tabs{display:flex;gap:2px;padding:12px 10px 0;flex:none}
+#tabs button{display:flex;align-items:center;height:26px;padding:0 8px;
+background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
+font:11px/18px var(--mono);text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
+#tabs button:hover{color:var(--fg)}
+#tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+#tabs .sub{margin-left:6px}
+.tab{flex:1;min-height:0;overflow:auto;padding:10px 14px 14px}
+#graph{padding:0;overflow:hidden;display:flex;flex-direction:column}
+/* The shell paints its own background, so this pane's colour has to be the one handed
+   to it: a pane a shade apart from the letters inside it shows as a band down the left
+   and across the top, and the rows never divide the height evenly so the last of it
+   shows at the bottom too. */
+#term{padding:6px 0 0 10px;overflow:hidden;background:var(--bg)}
+#term .shell{height:100%}
+#term .shell[hidden]{display:none}
+#term .xterm{height:100%}
+/* The library's own sheet paints this black and nothing in the theme we hand it takes
+   that back. The letters are drawn over it row by row, so what shows is the black the
+   rows do not cover: a band down the left and along the top where the pane breathes,
+   and the remainder at the bottom, since whole rows never divide the height evenly.
+   Taking the colour off rather than setting ours keeps one colour for this pane. */
+#term .xterm-viewport{background-color:transparent}
+#doc{grid-area:doc}
+h2.panel{height:24px;margin:0 0 8px;font:11px/18px var(--mono);text-transform:uppercase;
+letter-spacing:.04em;color:var(--dim);
+display:flex;justify-content:space-between;align-items:center;gap:8px}
+h2.panel button{display:inline-flex;align-items:center;gap:5px;background:none;
+border:1px solid var(--line);color:var(--dim);border-radius:6px;max-width:60%;
+font:inherit;font-size:11px;height:22px;padding:0 7px;cursor:pointer}
+h2.panel button svg{width:12px;height:12px;flex:none;display:block}
+h2.panel button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+h2.panel button:hover{color:var(--fg);border-color:var(--dim)}
+ul.list{list-style:none;margin:0;padding:0}
+ul.list li{padding:4px 7px;border-radius:6px;cursor:pointer}
+ul.list li:hover{background:var(--hover)}
+ul.list li.on{background:var(--on);color:var(--on-fg)}
+#hist .list li>.sub{display:block;overflow:hidden;text-overflow:ellipsis;
+white-space:nowrap}
+#hist .list li>b+.sub{display:inline}
+.md .lit{animation:lit 1.4s ease-out;border-radius:6px}
+@keyframes lit{from{background:var(--lit)}to{background:transparent}}
+#hist>p.sub{margin:0 0 6px}
+#hist .diff{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+#hist .hunk{margin:0 0 16px;padding:2px 0 2px 10px;border-left:2px solid transparent;
+border-radius:6px}
+#hist .hunk.go{cursor:pointer}
+#hist .hunk.go:hover{border-left-color:var(--accent);background:var(--hover)}
+#hist .hunk>.sub{margin:0 0 5px;font-size:11px;letter-spacing:.04em}
+#hist .hunk.go:hover>.sub{color:var(--accent)}
+#hist .drow{white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:20px;
+padding:3px 9px;margin:2px 0;border-radius:6px;border-left:2px solid}
+#hist .drow.add{background:var(--add);color:var(--add-fg);border-left-color:var(--add-line)}
+#hist .drow.del{background:var(--del);color:var(--del-fg);border-left-color:var(--del-line)}
+#hist .drow mark{border-radius:6px;padding:1px 2px}
+#hist .drow.add mark{background:var(--add-mark);color:var(--add-mark-fg)}
+#hist .drow.del mark{background:var(--del-mark);color:var(--del-mark-fg)}
+#hist .gone{margin-left:8px;border:1px solid var(--line);border-radius:6px;
+padding:0 5px;font-size:10px;letter-spacing:.06em}
+/* The documents one change touched. They sit under the row and are pressable on their
+   own, so the row stays one thing to click and the names stay another. */
+#hist .touched{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0}
+#hist .touched .one{font-size:11px;color:var(--dim);border:1px solid var(--line);
+border-radius:6px;padding:1px 6px;cursor:pointer;max-width:100%;overflow:hidden;
+text-overflow:ellipsis;white-space:nowrap}
+#hist .touched .one:hover{color:var(--fg);border-color:var(--dim)}
+#hist .touched .one.on{color:var(--fg);border-color:var(--accent)}
+#hist .subject{margin:0 0 8px;color:var(--fg)}
+#hist .why{margin:0;color:var(--dim);font-size:12px;white-space:pre-wrap;
+border-left:2px solid var(--line);padding-left:10px}
+#hist .verline{display:flex;align-items:center;gap:9px;margin:0 0 10px}
+#hist button.back{flex:none;display:inline-flex;align-items:center;justify-content:center;
+width:26px;height:22px;padding:0;background:none;border:1px solid var(--line);
+color:var(--dim);border-radius:6px;cursor:pointer}
+#hist button.back svg{width:14px;height:14px;display:block}
+#hist button.back:hover{color:var(--fg);border-color:var(--dim)}
+.sub{color:var(--dim);font-size:12px;line-height:20px}
+#search,.find{width:100%;padding:7px 9px;background:var(--code);border:1px solid var(--line);
+border-radius:6px;color:var(--fg);font:inherit}
+.find{margin:0 0 8px}
+#search:focus,.find:focus{outline:none;border-color:var(--accent)}
+/* The row the arrow keys are standing on, and the row the tab key has reached. They
+   look the same on purpose: one mark, however the hand got there. */
+ul.list li.pick,ul.list li:focus{background:var(--on);outline:1px solid var(--accent);
+outline-offset:-1px}
+ul.list li:focus{outline-style:dashed}
+.empty{color:var(--dim);font-size:13px;line-height:20px}
+.md h1,.md h2,.md h3,.md h4{line-height:1.3;margin:1.2em 0 .5em}
+.md h1{font-size:21px;border-bottom:1px solid var(--line);padding-bottom:6px;margin-top:0}
+.md h2{font-size:17px}
+.md h3{font-size:15px}
+.md h4{font-size:14px;color:var(--dim)}
+.md table{border-collapse:collapse;margin:1em 0;width:100%}
+.md th,.md td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+.md th{background:var(--head);color:var(--dim)}
+.md code{background:var(--code);padding:1px 5px;border-radius:6px;font-size:12.5px}
+ul.list li.cmd{display:flex;align-items:center;gap:5px;cursor:default}
+ul.list li.cmd .what{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+white-space:nowrap;cursor:pointer}
+ul.list li.cmd .what:hover{color:var(--accent)}
+#hist li.cmd .what{cursor:default}
+#hist li.cmd .what:hover{color:var(--dim)}
+ul.list li.cmd .where{flex:none;color:var(--dim);font-size:11px;max-width:40%;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ul.list li.cmd button{flex:none;display:inline-flex;align-items:center;justify-content:center;
+width:24px;height:22px;padding:0;background:none;border:1px solid var(--line);
+color:var(--dim);border-radius:6px;cursor:pointer}
+ul.list li.cmd button svg{width:14px;height:14px;display:block}
+ul.list li.cmd button:hover{color:var(--fg);border-color:var(--dim)}
+ul.list li.cmd button.ok{color:var(--ok);border-color:var(--ok-line)}
+.md pre{background:var(--code);padding:10px 12px;border-radius:6px;overflow:auto;position:relative}
+.md pre .tools{position:absolute;top:5px;right:5px;display:flex;gap:4px;opacity:0}
+.md pre:hover .tools,.md pre .tools:focus-within{opacity:1}
+.md pre .tools button{display:inline-flex;align-items:center;justify-content:center;
+width:24px;height:22px;padding:0;background:var(--panel);border:1px solid var(--line);
+color:var(--dim);border-radius:6px;cursor:pointer}
+.md pre .tools button svg{width:14px;height:14px;display:block}
+.md pre .tools button:hover{color:var(--fg);border-color:var(--dim)}
+.md pre .tools button.ok{color:var(--ok);border-color:var(--ok-line)}
+.md pre code{background:none;padding:0}
+.md pre.mermaid{background:transparent;padding:6px 0;text-align:center}
+.md pre.mermaid svg{max-width:100%;height:auto}
+.md a{color:var(--accent)}
+.md a.out{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.md a.out::after{content:" ↗";font-size:11px}
+.md a.dead{color:var(--dim);cursor:default;text-decoration:line-through}
+.md blockquote{margin:1em 0;padding:2px 12px;border-left:3px solid var(--line);color:var(--dim)}
+.md hr{border:0;border-top:1px solid var(--line);margin:1.4em 0}
+mark{background:var(--found);color:var(--found-fg);border-radius:6px}
+#docpath{text-transform:none;letter-spacing:0}
+iframe#gbody{flex:1;width:100%;border:0;background:var(--panel)}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="door">
+  <h1>Refdex</h1>
+  <button id="pick">Open folder</button>
+  <!-- Only when something is wrong. With nothing to report the door shows the one thing
+       to press and the lines that say what pressing it is for; a line saying no folder
+       is open would say what the button beneath it already says. -->
+  <p id="why" class="bad" hidden></p>
+  <p class="hint">Choose the folder that holds your projects.</p>
+  <!-- The folder is held by the shortcut that started this window and by nothing else,
+       so a folder chosen here is gone when the window closes. Saying so is the whole of
+       the help available: the app has no place to write the choice down. -->
+  <p class="hint">A folder chosen here lasts until this window closes.<br>
+     To open the same one every time, put it after the program in a shortcut's target.</p>
+  </div>
+  <dl id="about"></dl>
+</div>
+
+<div id="app" hidden>
+  <aside id="projects">
+    <h2 class="panel">Project <button id="repick" title="Read a different folder">folder</button></h2>
+    <ul class="list" id="alist"></ul>
+  </aside>
+  <aside id="shortcuts">
+    <h2 class="panel">Commands</h2>
+    <ul class="list" id="dlist"></ul>
+  </aside>
+  <section id="center">
+    <nav id="tabs">
+      <button data-tab="search" class="on">Search<span id="hitcount" class="sub"></span></button>
+      <button data-tab="hist">History</button>
+      <button data-tab="term">Terminal</button>
+      <button data-tab="graph">Graph</button>
+    </nav>
+    <section class="tab" data-tab="search" id="tools">
+      <input id="search" placeholder="search all documents">
+      <ul class="list" id="hits"></ul>
+    </section>
+    <section class="tab" data-tab="hist" id="hist" hidden></section>
+    <section class="tab" data-tab="term" id="term" hidden></section>
+    <main class="tab" data-tab="graph" id="graph" hidden>
+      <div id="gbody" class="empty" style="padding:0 14px 14px;flex:none"></div>
+    </main>
+  </section>
+  <div class="grip v" id="gripA"></div>
+  <div class="grip v" id="gripB"></div>
+  <div class="grip h" id="gripC"></div>
+  <article id="doc">
+    <h2 class="panel"><span id="docpath"></span></h2>
+    <div class="md" id="mdbody"></div>
+  </article>
+</div>
+
+<script>
+"use strict";
+
+/* Markdown to HTML. Without this the right panel shows raw text.
+   Covers headings, tables, lists, quotes, fences, inline marks.
+   Nested lists are flattened to one level. */
+/* The quote is escaped along with the tag characters. A link target lands inside an
+   attribute, so leaving it raw lets a document close the attribute and open an event
+   handler of its own, which then runs in this page. */
+function esc(s){
+  return s.replace(/[&<>"]/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+  });
+}
+
+/* A document in the folder is read, never run. These targets would run in this page,
+   and this page can open a shell in that same folder. */
+function safeUrl(u){
+  return !/^(javascript|data|vbscript|file):/i.test(u.replace(/[\s\u0000-\u001f]/g, ""));
+}
+
+function inline(s){
+  return s.replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+          .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(all, alt, target){
+            return safeUrl(target) ? "<img alt=\"" + alt + "\" data-src=\"" + target + "\">"
+                                   : "[" + (alt || "image") + "]";
+          })
+          .replace(/\[([^\]]*)\]\(([^)]+)\)/g, function(all, text, target){
+            return safeUrl(target) ? "<a href=\"" + target + "\">" + text + "</a>" : text;
+          });
+}
+function mdToHtml(src){
+  var lines = esc(src.replace(/\r\n?/g, "\n")).split("\n"), out = [], i = 0, m;
+  var BLOCK = /^(#{1,6} |```| *\||[-*] | *\d+\. | *&gt;)/;
+  function cells(row){
+    return row.trim().replace(/^\||\|$/g, "").split("|").map(function(c){ return inline(c.trim()); });
+  }
+  while(i < lines.length){
+    var L = lines[i];
+    if(/^```/.test(L)){
+      var lang = L.slice(3).trim().toLowerCase();
+      var b = []; i++;
+      while(i < lines.length && !/^```/.test(lines[i])) b.push(lines[i++]);
+      i++;
+      /* A mermaid fence keeps its source as text so wire() can hand it to the
+         renderer. Without the class it would stay a code block forever. */
+      if(lang === "mermaid"){
+        out.push("<pre class=\"mermaid\">" + b.join("\n") + "</pre>");
+        continue;
+      }
+      /* The language rides along: it is what tells a line meant for a shell from a
+         folder tree that only looks like one. A blank last line is the Enter — it is
+         written where the command is, so the button keeps nothing to itself. */
+      var enter = b.length > 1 && b[b.length - 1].trim() === "";
+      while(b.length && b[b.length - 1].trim() === "") b.pop();
+      out.push("<pre data-lang=\"" + lang.replace(/[^a-z0-9+#.-]/g, "") + "\"" +
+        (enter ? " data-enter=\"1\"" : "") + "><code>" + b.join("\n") + "</code></pre>");
+      continue;
+    }
+    /* A comment is written for whoever edits the file, not for whoever reads it, and
+       every other renderer drops it. This one escaped it and put the template on the
+       page instead. It comes after the fence above, so a comment shown inside a code
+       block has already been taken and stays visible. */
+    if(/^\s*&lt;!--/.test(L)){
+      while(i < lines.length && !/--&gt;/.test(lines[i])) i++;
+      i++;
+      continue;
+    }
+    if(/^ *\|.*\| *$/.test(L) && i + 1 < lines.length && /^ *\|[ :\-|]+\| *$/.test(lines[i+1])){
+      var head = cells(L); i += 2;
+      var rows = [];
+      while(i < lines.length && /^ *\|.*\| *$/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push("<table><thead><tr>" +
+        head.map(function(c){ return "<th>" + c + "</th>"; }).join("") +
+        "</tr></thead><tbody>" +
+        rows.map(function(r){
+          return "<tr>" + r.map(function(c){ return "<td>" + c + "</td>"; }).join("") + "</tr>";
+        }).join("") + "</tbody></table>");
+      continue;
+    }
+    if(m = L.match(/^(#{1,6}) +(.*)$/)){
+      var n = m[1].length;
+      out.push("<h" + n + ">" + inline(m[2]) + "</h" + n + ">");
+      i++; continue;
+    }
+    if(/^(-{3,}|\*{3,})$/.test(L.trim())){ out.push("<hr>"); i++; continue; }
+    if(/^ *([-*]|\d+\.) +/.test(L)){
+      /* A list is read by how far each line is pushed in. Deeper lines open a list
+         inside the item above them and shallower ones close back to the depth that
+         holds them, so what the document shows as a tree is drawn as one. */
+      var open = [];
+      var html = "";
+      while(i < lines.length && /^ *([-*]|\d+\.) +/.test(lines[i])){
+        var row = lines[i++];
+        var pad = row.match(/^ */)[0].length;
+        var kind = /^ *\d+\. +/.test(row) ? "ol" : "ul";
+        var text = inline(row.replace(/^ *([-*]|\d+\.) +/, ""));
+        while(open.length && pad < open[open.length - 1].pad){
+          html += "</li></" + open.pop().kind + ">";
+        }
+        if(!open.length || pad > open[open.length - 1].pad){
+          /* A deeper line belongs inside the item above it, which is still open. */
+          html += "<" + kind + "><li>";
+          open.push({ pad: pad, kind: kind });
+        } else {
+          /* Same depth: close the item that was open and start the next one. A list
+             that changes kind at the same depth starts a new list of that kind. */
+          if(open[open.length - 1].kind !== kind){
+            html += "</li></" + open.pop().kind + "><" + kind + "><li>";
+            open.push({ pad: pad, kind: kind });
+          } else {
+            html += "</li><li>";
+          }
+        }
+        html += text;
+      }
+      while(open.length) html += "</li></" + open.pop().kind + ">";
+      out.push(html);
+      continue;
+    }
+    if(/^ *&gt; ?/.test(L)){
+      var q = [];
+      while(i < lines.length && /^ *&gt; ?/.test(lines[i])) q.push(lines[i++].replace(/^ *&gt; ?/, ""));
+      out.push("<blockquote>" + inline(q.join(" ")) + "</blockquote>");
+      continue;
+    }
+    if(L.trim() === ""){ i++; continue; }
+    var p = [];
+    while(i < lines.length && lines[i].trim() !== "" && !BLOCK.test(lines[i])) p.push(lines[i++]);
+    /* A block-looking line that no branch above took (a stray table row, say) would leave i
+       where it was and spin here forever. Take it as plain text and move on. */
+    if(!p.length) p.push(lines[i++]);
+    out.push("<p>" + inline(p.join(" ")) + "</p>");
+  }
+  return out.join("\n");
+}
+
+var S = { projects: [], cur: null, assets: {}, at: null, timer: null, sig: "", find: "", past: null, wait: null };
+function $(id){ return document.getElementById(id); }
+function dirOf(p){ var i = p.lastIndexOf("/"); return i < 0 ? "" : p.slice(0, i); }
+function base(p){ return p.slice(p.lastIndexOf("/") + 1); }
+function shortPath(d){ return S.cur.root ? d.path.slice(S.cur.root.length + 1) : d.path; }
+/* The files arrive through the app's own protocol, which Windows spells as a host name
+   and the others as a scheme. */
+var BASE = navigator.userAgent.indexOf("Windows") >= 0
+  ? "http://refdex.localhost/"
+  : "refdex://localhost/";
+function url(path){ return BASE + path.split("/").map(encodeURIComponent).join("/"); }
+
+/* Documents come from the small server beside this page. Search runs on every keystroke
+   and uses the kept copy; opening a document asks the server again. */
+function textOf(d, fresh){
+  if(d.text != null && !fresh) return Promise.resolve(d.text);
+  return fetch(url(d.path)).then(function(r){
+    if(!r.ok) throw new Error(r.status);
+    return r.text();
+  }).then(function(t){ d.text = t; return t; });
+}
+function resolvePath(dir, href){
+  var parts = dir ? dir.split("/") : [];
+  href.split("/").forEach(function(seg){
+    if(seg === "." || seg === "") return;
+    if(seg === "..") parts.pop();
+    else parts.push(seg);
+  });
+  return parts.join("/");
+}
+
+/* The names this screen looks for, matched without regard to case: the disk this runs on
+   does not tell CLAUDE.md and claude.md apart, so neither does the match. */
+function named(path, name){
+  return base(path).toUpperCase() === name;
+}
+
+/* A project is a folder inside the picked one that holds a document somewhere under it,
+   and the picked folder itself when a document sits in it directly. No name is asked for:
+   a folder with something to read is the whole of it. Only that first level counts, so a
+   document deeper down belongs to the folder it is under rather than splitting it. */
+function buildProjects(index){
+  /* The button is the only place the folder being read is named, so it carries the
+     name rather than a word for the act. A long name is cut short, and the whole
+     path waits under the pointer. */
+  $("repick").innerHTML = icon("folder");
+  var folderName = document.createElement("span");
+  folderName.textContent = index.root || "folder";
+  $("repick").appendChild(folderName);
+  $("repick").title = index.path || "Read a different folder";
+  S.assets = {};
+  (index.assets || []).forEach(function(p){ S.assets[p] = true; });
+  var docs = (index.docs || []).map(function(d){
+    return { path: d.path, stamp: d.stamp, text: null };
+  });
+  var graphs = index.graphs || {};
+  var roots = [];
+  docs.forEach(function(d){
+    var at = dirOf(d.path), cut = at.indexOf("/");
+    var top = cut < 0 ? at : at.slice(0, cut);
+    if(roots.indexOf(top) < 0) roots.push(top);
+  });
+  if(!roots.length) roots = [""];
+  roots.sort(function(a, b){ return b.length - a.length; });
+  S.projects = roots.map(function(r){
+    return { root: r, name: r || (index.root || "refdex"), docs: [], graph: graphs[r] || null };
+  });
+  docs.forEach(function(d){
+    for(var i = 0; i < S.projects.length; i++){
+      var r = S.projects[i].root;
+      if(r === "" || d.path.indexOf(r + "/") === 0){ S.projects[i].docs.push(d); return; }
+    }
+  });
+  S.projects.forEach(function(a){
+    a.docs.sort(function(x, y){ return x.path.localeCompare(y.path); });
+  });
+  S.projects.sort(function(a, b){ return a.name.localeCompare(b.name); });
+}
+
+function signature(index){
+  return (index.docs || []).map(function(d){ return d.path + ":" + d.stamp; }).join("|");
+}
+
+/* The index carries every document and when it last changed, so one small request
+   notices an edit, a new file and a deleted one alike. */
+function watch(){
+  clearInterval(S.timer);
+  /* One miss is a blink — a drive waking up, a folder being written to. Two in a row,
+     six seconds apart, is the folder being gone. Leaving the panes up would show a
+     folder that is not there, which is worse than saying so. */
+  var missed = 0;
+  S.timer = setInterval(function(){
+    fetch(url("_index")).then(function(r){ return r.json(); }).then(function(index){
+      missed = 0;
+      var sig = signature(index);
+      if(sig === S.sig) return;
+      S.sig = sig;
+      /* A version being read out of the record is not a file on disk. Redrawing it
+         from the folder would put today's document under yesterday's name. */
+      if(S.past) return;
+      var wasProject = S.cur ? S.cur.name : null;
+      var wasDoc = S.at ? S.at.path : null;
+      buildProjects(index);
+      var i = 0;
+      S.projects.forEach(function(a, n){ if(a.name === wasProject) i = n; });
+      /* The document being read is reopened, not the project's front page. Opening both
+         would put two reads in flight for one refresh and let the slower one win. */
+      var again = null;
+      S.projects[i].docs.forEach(function(d){ if(d.path === wasDoc) again = d; });
+      pickProject(i, again);
+    }).catch(function(){
+      if(++missed < 2) return;
+      showGate("The folder is no longer there.");
+    });
+  }, 3000);
+}
+
+/* Every giving-up lands here. The screen holds nothing of the folder once it is gone:
+   the panes would otherwise keep showing a folder that is no longer on disk, and every
+   row in them would be a dead link. */
+function showGate(why){
+  clearInterval(S.timer);
+  S.timer = null;
+  S.projects = [];
+  S.cur = null;
+  S.at = null;
+  S.past = null;
+  S.sig = "";
+  var line = $("why");
+  line.textContent = why || "";
+  line.hidden = !why;
+  $("gate").hidden = false;
+  $("app").hidden = true;
+  showAbout();
+}
+
+function boot(){
+  fetch(url("_index")).then(function(r){
+    if(!r.ok) throw new Error(r.status);
+    return r.json();
+  }).then(function(index){
+    S.sig = signature(index);
+    buildProjects(index);
+    $("gate").hidden = true;
+    $("app").hidden = false;
+    /* The saved sizes can only be measured against the window once the panes are on
+       screen. Before this line they have no size to compare with. */
+    fitPanes();
+    layout();
+    pickProject(0);
+    watch();
+  }).catch(function(){
+    /* The folder named at start-up is asked about rather than assumed, because the door
+       also stands when nothing was named at all and the two must not read the same. */
+    invoke("about").then(function(a){
+      showGate(a && a.missing ? a.missing + " is not a folder." : "");
+    }).catch(function(){ showGate(); });
+  });
+}
+
+/* What this is and what it leans on, on the one screen that has room for it. The app's
+   own version and Tauri's are stamped in when it is built, `git` is asked for when this
+   runs, and the browser names itself — so none of it is a number anyone typed out, and
+   none of it can drift from what is actually running. The drawn libraries name
+   themselves too, or say so when they have not been needed yet. */
+function showAbout(){
+  var box = $("about");
+  if(box.childElementCount) return;
+  /* WebView2 names itself twice, and the second name is the real one. */
+  var ua = navigator.userAgent;
+  var edge = (ua.match(/Edg\/[\d.]+/) || ua.match(/Chrome\/[\d.]+/) || ["unknown"])[0];
+  invoke("about").then(function(a){
+    [["Refdex", a.app + "  ·  " + a.os],
+     ["Tauri", a.tauri],
+     ["WebView", edge],
+     ["git", a.git || "not found — the History tab will say so"],
+     ["shell", a.shell],
+     ["drawn by", "mermaid, vis-network, xterm — see NOTICE"]
+    ].forEach(function(row){
+      var k = document.createElement("dt");
+      k.textContent = row[0];
+      var v = document.createElement("dd");
+      v.textContent = row[1];
+      box.appendChild(k);
+      box.appendChild(v);
+    });
+  }).catch(function(){});
+}
+boot();
+
+/* Nothing records the folder, so it is handed over at launch or picked here, and can
+   be changed again at any time without anything being written down. */
+function chooseFolder(){
+  invoke("pick").then(function(chosen){ if(chosen) boot(); });
+}
+$("pick").onclick = chooseFolder;
+$("repick").onclick = chooseFolder;
+
+function renderProjects(){
+  var ul = $("alist");
+  ul.innerHTML = "";
+  S.projects.forEach(function(a, i){
+    var li = document.createElement("li");
+    li.textContent = a.name;
+    li.className = a === S.cur ? "on" : "";
+    li.onclick = function(){ pickProject(i); };
+    ul.appendChild(li);
+  });
+}
+
+/* Marks drawn on a 24 grid, held here as text so the page stays one file and asks the
+   network for nothing. The stroke is thickened because they stand at 14px, where a
+   stroke of 2 draws thinner than it was meant to. */
+var ICONS = {
+  play: "<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/>",
+  copy: "<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/>"
+      + "<path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>",
+  check: "<path d=\"M20 6 9 17l-5-5\"/>",
+  back: "<path d=\"m12 19-7-7 7-7\"/><path d=\"M19 12H5\"/>",
+  folder: "<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2"
+        + " 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>"
+};
+function icon(name){
+  return "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\""
+       + " stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">"
+       + ICONS[name] + "</svg>";
+}
+
+/* One pass over a document for the fenced blocks a shell would take, each with the
+   heading it sits under. The rules are the ones the document pane draws with, so a
+   block that carries buttons there is a row here and nothing else is. */
+function blocksIn(text){
+  var lines = text.replace(/\r\n?/g, "\n").split("\n"), out = [], title = null;
+  for(var i = 0; i < lines.length; i++){
+    var h = lines[i].match(/^#{1,6} +(.*)$/);
+    if(h){ title = h[1]; continue; }
+    if(!/^```/.test(lines[i])) continue;
+    var lang = lines[i].slice(3).trim().toLowerCase(), b = [];
+    i++;
+    while(i < lines.length && !/^```/.test(lines[i])) b.push(lines[i++]);
+    if(!SHELL[lang]) continue;
+    var enter = b.length > 1 && b[b.length - 1].trim() === "";
+    while(b.length && b[b.length - 1].trim() === "") b.pop();
+    if(!b.length) continue;
+    out.push({ head: title, body: b.join("\n"), enter: enter });
+  }
+  /* Blocks under one heading are the steps of one thing, and the heading alone would
+     give them all the same row. Numbered, they read as the order they are written in. */
+  var seen = {};
+  out.forEach(function(b){ seen[b.head] = (seen[b.head] || 0) + 1; });
+  var at = {};
+  out.forEach(function(b){
+    if(seen[b.head] < 2) return;
+    at[b.head] = (at[b.head] || 0) + 1;
+    b.step = at[b.head];
+  });
+  return out;
+}
+
+/* A row for one block: what it is, where it is written, and the two buttons the block
+   carries in the document. The label is the way to that place — a command about to run
+   should be readable next to the words that explain it. */
+function commandRow(d, b){
+  var li = document.createElement("li");
+  li.className = "cmd";
+  var what = document.createElement("span");
+  what.className = "what";
+  what.textContent = (b.head || b.body.split("\n")[0]) + (b.step ? " · " + b.step : "");
+  what.title = b.body;
+  what.onclick = function(){
+    openDoc(d).then(function(){
+      if(!b.head) return;
+      var el = headingIn(b.head);
+      if(!el) return;
+      el.scrollIntoView({ block: "start" });
+      el.classList.remove("lit");
+      void el.offsetWidth;
+      el.classList.add("lit");
+    });
+  };
+  var where = document.createElement("span");
+  where.className = "where";
+  where.textContent = base(d.path);
+  where.title = d.path;
+  /* The command rides on the button, not in a variable the next row overwrites. */
+  var run = document.createElement("button");
+  run.innerHTML = icon("play");
+  run.title = b.enter ? "type it into the terminal and run it" : "type it into the terminal";
+  run.onclick = function(){ runCommand(b.body, b.enter); };
+  var copy = document.createElement("button");
+  copy.innerHTML = icon("copy");
+  copy.title = "copy";
+  copy.onclick = function(){ copyText(b.body, this); };
+  li.appendChild(what);
+  li.appendChild(where);
+  li.appendChild(run);
+  li.appendChild(copy);
+  return li;
+}
+
+/* The pane gathers the shell blocks of every document in the project, so a command is
+   at hand wherever you are reading and no file has to carry a name this screen knows. */
+function renderCommands(){
+  var box = $("dlist"), mine = S.cur;
+  box.innerHTML = "<li class=\"empty\">Reading the documents…</li>";
+  Promise.all(mine.docs.map(function(d){
+    return textOf(d).catch(function(){ return ""; });
+  })).then(function(texts){
+    /* Another project may have been picked while the documents were being read. */
+    if(S.cur !== mine) return;
+    box.innerHTML = "";
+    mine.docs.forEach(function(d, k){
+      blocksIn(texts[k]).forEach(function(b){ box.appendChild(commandRow(d, b)); });
+    });
+    if(!box.firstChild){
+      box.innerHTML = "<li class=\"empty\">No shell block in this project.</li>";
+    }
+  });
+}
+
+/* Copying is the other thing a code block offers, and it works on a block no shell
+   would take — a folder tree, a table, a line for another machine. */
+function copyText(text, button){
+  var done = function(){
+    /* The mark itself says it landed, so the button does not have to change size. */
+    var was = button.innerHTML;
+    button.innerHTML = icon("check");
+    button.classList.add("ok");
+    setTimeout(function(){ button.innerHTML = was; button.classList.remove("ok"); }, 1200);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+/* A page opened from disk may have no clipboard API, and a dead button is worse
+   than an old one. execCommand still works there. */
+function fallbackCopy(text, done){
+  var box = document.createElement("textarea");
+  box.value = text;
+  box.setAttribute("style", "position:fixed;top:-1000px");
+  document.body.appendChild(box);
+  box.select();
+  try { document.execCommand("copy"); done(); } catch(e) { /* nothing to do */ }
+  document.body.removeChild(box);
+}
+
+function pickProject(i, reopen){
+  S.cur = S.projects[i];
+  renderProjects();
+  renderCommands();
+  showGraph();
+  /* The terminal belongs to the project too, so it changes with it. Only when the tab
+     is on show — otherwise a shell would start for a project nobody has looked at. */
+  if(!$("term").hidden) openTerm().catch(function(){});
+  /* A refresh names the document that was already open; only a fresh pick falls back to
+     the front page. */
+  if(reopen){ openDoc(reopen); return; }
+  /* The front page is the project's own README, never a list this app invents. CLAUDE is
+     the fallback, but it is a rules file and tends to link little. */
+  var entry = null;
+  ["README.MD", "CLAUDE.MD"].forEach(function(name){
+    if(entry) return;
+    /* At the project's own root, not wherever one happens to sit deeper down. */
+    S.cur.docs.forEach(function(d){
+      if(dirOf(d.path) === S.cur.root && named(d.path, name)) entry = d;
+    });
+  });
+  if(!entry && S.cur.docs.length) entry = S.cur.docs[0];
+  if(entry) openDoc(entry);
+  /* An empty folder is the one place the app has to speak for itself: there is no
+     document here to say what belongs here. Written as markdown so the renderer
+     that draws every other page draws this one too. */
+  else {
+    S.at = null;
+    $("docpath").textContent = "";
+    $("mdbody").innerHTML = mdToHtml(
+      "## Nothing to read here\n\n" +
+      "A folder becomes a project the moment it holds one `.md`. Nothing has to be named, " +
+      "but two names do have a meaning here.\n\n" +
+      "| Put this | and it becomes |\n| :--- | :--- |\n" +
+      "| `README.md` | the document the project opens with |\n" +
+      "| `CLAUDE.md` | what opens when there is no README |\n" +
+      "| any `.md` with a shell code block | a command you can type into the terminal from where it is written |\n" +
+      "| `graphify-out/graph.html` | the Knowledge graph pane |\n\n" +
+      "Nothing is written back. Documents are read from the folder every time."
+    );
+  }
+}
+
+/* Going back is the link at the top of every document, not a button. */
+function openDoc(d, term){
+  /* The same document redrawn is the one you were already reading — a save three
+     seconds ago, not a move. The place in it is yours and is kept. */
+  var place = S.at && S.at.path === d.path && !S.past ? $("doc").scrollTop : 0;
+  S.at = d;
+  S.past = null;
+  $("docpath").textContent = shortPath(d);
+  if(!$("hist").hidden) showHistory();
+  /* Returned so a caller that meant a place inside the document can wait for it. */
+  return textOf(d, true).then(function(t){
+    if(S.at !== d) return;
+    $("mdbody").innerHTML = mdToHtml(t);
+    if(term) highlight($("mdbody"), term);
+    wire(dirOf(d.path));
+    $("doc").scrollTop = place;
+  }).catch(function(err){
+    /* A file can go between the moment it was listed and the moment it is asked for.
+       Saying so beats leaving the last document under this one's name, and a file the
+       app refuses to hold is a different answer from one that is gone. */
+    if(S.at !== d) return;
+    $("mdbody").innerHTML = "";
+    var p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = String(err && err.message) === "413"
+      ? "This document is too large to show here. Open it in an editor."
+      : "This document could not be read. It may have been moved or removed.";
+    $("mdbody").appendChild(p);
+  });
+}
+
+/* Relative images and .md links only resolve through files already in hand.
+   Without this, images stay broken and a document link leaves the page. */
+var drawn = 0;
+/* Draws every mermaid fence in the document just rendered. With no mermaid.min.js
+   beside index.html the blocks stay as text, which is the only thing lost. */
+/* The colours live in one place, the stylesheet, and the two things drawn by a library
+   rather than by CSS have to be handed their values from there. */
+function paint(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* mermaid is most of what this page weighs and most documents draw nothing, so it is
+   fetched the first time a diagram actually appears. */
+var mermaidReady = null;
+function loadMermaid(){
+  if(mermaidReady) return mermaidReady;
+  mermaidReady = new Promise(function(ok, bad){
+    var tag = document.createElement("script");
+    tag.src = "mermaid.min.js";
+    tag.onload = function(){ ok(); };
+    tag.onerror = function(){ bad(new Error("mermaid.min.js is not beside this page")); };
+    document.head.appendChild(tag);
+  });
+  return mermaidReady;
+}
+function drawDiagrams(){
+  var blocks = $("mdbody").querySelectorAll("pre.mermaid");
+  if(!blocks.length) return;
+  var note = function(el, msg){ el.textContent = el.textContent + "\n\n[mermaid] " + msg; };
+  loadMermaid().then(function(){
+    /* Set up at every draw, not once at load: the colours come from the stylesheet and
+       the stylesheet follows the system, so a drawing made later must ask again.
+       securityLevel is named rather than left to the library's default, because the
+       diagram source comes from the folder and its labels are injected as SVG here. */
+    mermaid.initialize({ startOnLoad: false, theme: paint("--diagram"), securityLevel: "strict",
+      themeVariables: { fontSize: "12px" }, flowchart: { curve: "basis", useMaxWidth: true } });
+    Array.prototype.forEach.call(blocks, function(el){
+      var src = el.textContent;
+      mermaid.render("d" + (drawn++), src).then(function(r){
+        el.innerHTML = r.svg;
+      }).catch(function(e){ note(el, e.message); });
+    });
+  }).catch(function(e){
+    Array.prototype.forEach.call(blocks, function(el){ note(el, e.message); });
+  });
+}
+
+/* Marks the search word in what is on screen. Only the words are touched, never the
+   drawn page itself: run over the markup instead and the word lands inside a link's
+   address as readily as inside a sentence, and that address is then wrong. */
+function highlight(root, term){
+  var safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  var re = new RegExp(safe, "gi");
+  var walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  var hits = [], n;
+  while((n = walk.nextNode())) if(re.test(n.nodeValue)){ re.lastIndex = 0; hits.push(n); }
+  hits.forEach(function(node){
+    var parts = node.nodeValue.split(re), keep = node.nodeValue.match(re) || [];
+    var frag = document.createDocumentFragment();
+    parts.forEach(function(part, i){
+      if(part) frag.appendChild(document.createTextNode(part));
+      if(i < keep.length){
+        var m = document.createElement("mark");
+        m.textContent = keep[i];
+        frag.appendChild(m);
+      }
+    });
+    node.parentNode.replaceChild(frag, node);
+  });
+}
+
+/* A link with nowhere to go. The href goes with it: dimming a live link only makes it
+   look safe to press. */
+function dead(a, why){
+  a.removeAttribute("href");
+  a.className = "dead";
+  a.title = why;
+}
+
+/* A link out of the folder. The address stays on it, so it can be read, copied and
+   followed the way any link is — it just opens in the machine's own browser instead of
+   here. The app refuses to leave its own page in any case, so a click that slips past
+   this lands nowhere rather than somewhere. */
+function outward(a, href){
+  a.className = "out";
+  a.title = "opens in your browser — " + href;
+  a.onclick = function(e){
+    e.preventDefault();
+    if(!confirm("This link leaves the folder.\n\n" + href + "\n\nOpen it in your browser?")) return;
+    invoke("open_external", { url: href }).catch(function(err){
+      a.title = String(err);
+      a.className = "dead";
+    });
+  };
+}
+
+/* The words a fence may carry for a shell. Any other language is something to copy,
+   not a line to type — a folder tree or a table would otherwise look like a command. */
+var SHELL = { bash: 1, sh: 1, shell: 1, zsh: 1, fish: 1,
+              powershell: 1, pwsh: 1, ps1: 1, cmd: 1, bat: 1, batch: 1 };
+
+function wire(dir){
+  drawDiagrams();
+  /* A command sits in the document that explains it, with its buttons beside it. So
+     nothing has to be registered, and no file has to carry a name this screen knows. */
+  Array.prototype.forEach.call($("mdbody").querySelectorAll("pre[data-lang]"), function(pre){
+    var body = pre.querySelector("code").textContent;
+    var tools = document.createElement("div");
+    tools.className = "tools";
+    if(SHELL[pre.getAttribute("data-lang")]){
+      var enter = pre.getAttribute("data-enter") === "1";
+      var run = document.createElement("button");
+      run.innerHTML = icon("play");
+      run.title = enter ? "type it into the terminal and run it" : "type it into the terminal";
+      run.onclick = function(){ runCommand(body, enter); };
+      tools.appendChild(run);
+    }
+    var copy = document.createElement("button");
+    copy.innerHTML = icon("copy");
+    copy.title = "copy";
+    copy.onclick = function(){ copyText(body, this); };
+    tools.appendChild(copy);
+    pre.appendChild(tools);
+  });
+  Array.prototype.forEach.call($("mdbody").querySelectorAll("img[data-src]"), function(img){
+    var pic = resolvePath(dir, img.getAttribute("data-src"));
+    if(!S.assets[pic]){
+      img.parentNode.replaceChild(document.createTextNode("[" + (img.alt || "image") + "]"), img);
+      return;
+    }
+    img.src = url(pic);
+    img.style.maxWidth = "100%";
+  });
+  Array.prototype.forEach.call($("mdbody").querySelectorAll("a[href]"), function(a){
+    var href = a.getAttribute("href");
+    /* A link may carry a heading anchor. The anchor is dropped: the pane has no
+       scroll target for it, but the document it names is still the right one. */
+    var bare = href.split("#")[0];
+    /* Nothing is followed where it points. A link that leaves the folder would take
+       this window with it — there is no address bar and no way back — and a page from
+       the folder would then run where this page runs. */
+    if(/^[a-z]+:/i.test(href)){ outward(a, href); return; }
+    if(!/\.md$/i.test(bare)){ dead(a, "not a document"); return; }
+    var path = resolvePath(dir, bare), hit = null;
+    S.projects.forEach(function(p){
+      p.docs.forEach(function(d){ if(d.path === path) hit = { p: p, d: d }; });
+    });
+    if(!hit){ dead(a, "not in the picked folder"); return; }
+    a.href = "#";
+    a.onclick = function(e){
+      e.preventDefault();
+      if(S.cur !== hit.p) pickProject(S.projects.indexOf(hit.p));
+      openDoc(hit.d);
+    };
+  });
+}
+
+/* The graph goes straight into the pane when a project is picked. It lays itself out
+   on this page's own thread, so a graph with many nodes slows the whole app down. */
+function showGraph(){
+  var old = $("gbody"), next;
+  if(S.cur.graph){
+    next = document.createElement("iframe");
+    /* The page inside comes from the folder we only read, so it is given its own
+       opaque origin. Without this it is served by the app's own protocol and gets
+       the app bridge, which can open a shell in that folder and type into it. */
+    next.setAttribute("sandbox", "allow-scripts");
+    next.src = url(S.cur.graph);
+  } else {
+    next = document.createElement("div");
+    next.className = "empty";
+    next.setAttribute("style", "padding:0 14px 14px;flex:none");
+    next.textContent = "No graph in this project.";
+  }
+  next.id = "gbody";
+  old.parentNode.replaceChild(next, old);
+}
+
+function invoke(cmd, args){ return window.__TAURI_INTERNALS__.invoke(cmd, args || {}); }
+/* The app speaks back through events. Without the packaged API this is the call the
+   package would make, so the terminal can be fed as its shell writes. */
+function listen(name, take){
+  var id = window.__TAURI_INTERNALS__.transformCallback(function(e){ take(e.payload); });
+  return invoke("plugin:event|listen", { event: name, target: { kind: "Any" }, handler: id });
+}
+
+/* xterm is the second thing this page keeps beside it, and most sessions never open a
+   terminal, so it is fetched the first time that tab is chosen. */
+var termReady = null;
+function loadTerm(){
+  if(termReady) return termReady;
+  termReady = new Promise(function(ok, bad){
+    var css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "xterm.css";
+    document.head.appendChild(css);
+    var one = document.createElement("script");
+    one.src = "xterm.js";
+    one.onload = function(){
+      var two = document.createElement("script");
+      two.src = "xterm-addon-fit.js";
+      two.onload = function(){ ok(); };
+      two.onerror = function(){ bad(new Error("xterm-addon-fit.js is not beside this page")); };
+      document.head.appendChild(two);
+    };
+    one.onerror = function(){ bad(new Error("xterm.js is not beside this page")); };
+    document.head.appendChild(one);
+  });
+  return termReady;
+}
+
+/* A pseudo terminal on the other side is what makes the shell print a prompt, keep
+   history and send colour. The screen here is only the half that draws.
+   One of each per project, kept by the project's folder. Everything else in this pane
+   already belongs to the project being read, and a shell that outlived the project
+   would answer a command with paths from somewhere else. Switching projects hides one
+   screen and shows another; what each printed stays where it was. */
+var TERMS = {}, termWired = false;
+function termKey(){ return S.cur ? S.cur.root : ""; }
+function termNow(){ return TERMS[termKey()] || null; }
+
+/* Reading the clipboard can be refused. Plain Ctrl+V still arrives as the webview's own
+   paste, so a refusal here leaves the user a way in rather than a dead end. */
+function pasteIntoTerm(){
+  var cur = termNow();
+  if(!cur || !cur.term) return;
+  navigator.clipboard.readText()
+    .then(function(t){ if(t) cur.term.paste(t); })
+    .catch(function(){});
+}
+
+/* The pane and the shell's events outlive any one screen, so these are hooked up once.
+   Hooking them up per shell would stack handlers and print every byte twice over. */
+function wireTerm(){
+  termWired = true;
+  /* Releasing a drag copies what was selected and the right button pastes, the way a
+     terminal is expected to behave. Only the left button copies: letting the right one
+     copy too would overwrite the clipboard a moment before pasting it back. */
+  $("term").addEventListener("mouseup", function(e){
+    var cur = termNow();
+    if(e.button === 0 && cur && cur.term && cur.term.hasSelection()){
+      navigator.clipboard.writeText(cur.term.getSelection()).catch(function(){});
+    }
+  });
+  $("term").addEventListener("contextmenu", function(e){
+    e.preventDefault();
+    pasteIntoTerm();
+  });
+  /* Several shells report at once, so each message says whose it is and is written to
+     that project's screen — the one in front may not be the one that spoke. */
+  listen("term-out", function(p){
+    var one = TERMS[p.project];
+    if(one && one.term) one.term.write(p.data);
+  });
+  listen("term-end", function(p){
+    var one = TERMS[p.project];
+    if(!one || one.up === null) return;
+    /* Dropping this is what lets the tab hand out a new shell. Without it the pane
+       keeps a dead screen that swallows everything typed into it. */
+    one.up = null;
+    if(one.term) one.term.write("\r\n[shell closed] press the Terminal tab again for a new one\r\n");
+  });
+}
+
+/* Only the current project's screen is on show. The others keep their scrollback where
+   it is, so coming back to a project finds the session as it was left. */
+function faceTerm(key){
+  Object.keys(TERMS).forEach(function(k){
+    if(TERMS[k].node) TERMS[k].node.hidden = (k !== key);
+  });
+}
+
+function openTerm(){
+  var key = termKey();
+  var one = TERMS[key] || (TERMS[key] = { node: null, term: null, fit: null, up: null });
+  if(one.up){
+    faceTerm(key);
+    return one.up.then(function(){ one.fit.fit(); one.term.focus(); });
+  }
+  one.up = loadTerm().then(function(){
+    /* A screen is built once per project. A shell that ended leaves its screen standing,
+       so pressing the tab again starts a shell under the text that is already there. */
+    if(!one.term){
+      one.node = document.createElement("div");
+      one.node.className = "shell";
+      $("term").appendChild(one.node);
+      one.term = new Terminal({
+        fontSize: 12, fontFamily: "Cascadia Mono, Consolas, D2Coding, monospace", cursorBlink: true,
+        theme: { background: paint("--bg"), foreground: paint("--term-fg"),
+                 cursor: paint("--term-cursor") }
+      });
+      one.fit = new FitAddon.FitAddon();
+      one.term.loadAddon(one.fit);
+      one.term.open(one.node);
+      one.term.onData(function(d){
+        invoke("term_write", { project: key, data: d });
+        /* The byte alone only cancels the line being typed. A command already
+           running needs the shell's console raised against it. */
+        if(d.indexOf("\u0003") >= 0) invoke("term_interrupt", { project: key }).catch(function(){});
+      });
+      one.term.onResize(function(s){
+        invoke("term_resize", { project: key, cols: s.cols, rows: s.rows });
+      });
+    }
+    if(!termWired) wireTerm();
+    faceTerm(key);
+    one.fit.fit();
+    one.term.focus();
+    /* Handed on rather than swallowed. A shell that never opened must leave the holder
+       empty, or the tab keeps handing back the dead screen and never tries again. */
+    return invoke("term_open", { project: key, cols: one.term.cols, rows: one.term.rows });
+  });
+  one.up.catch(function(e){
+    one.up = null;
+    var why = (e && e.message) || e;
+    if(one.term) one.term.write("\r\n[terminal] " + why + "\r\n[terminal] press the Terminal tab to try again\r\n");
+    else $("term").textContent = "[terminal] " + why;
+  });
+  return one.up;
+}
+
+/* The button types the command into the terminal instead of running it out of sight.
+   What happens is what you would have typed, and the last Enter stays yours — a block
+   that ends with a blank line asks for it, and that line is written in the document. */
+function runCommand(text, enter){
+  showTab("term");
+  openTerm().then(function(){
+    invoke("term_write", { project: termKey(), data: text.replace(/\r?\n/g, "\r") + (enter ? "\r" : "") });
+  /* A shell that never opened said why in the pane it stands in; nothing to add here. */
+  }).catch(function(){});
+}
+
+/* One of the middle column's tools is on screen at a time. Which one is never written
+   down: the column opens on search every time, the way it did before it had tabs. */
+/* The documents keep only what is true now, so what they used to say, and the reason it
+   changed, sits in the commit messages and nowhere else. This pane hands that back. The
+   version it opens stands beside the one in the document pane, and that is the
+   comparison: nothing has to be left to see what came before. */
+function histSay(text){
+  $("hist").innerHTML = "";
+  $("hist").className = "tab";
+  var p = document.createElement("p");
+  p.className = "empty";
+  p.textContent = text;
+  $("hist").appendChild(p);
+}
+
+/* A heading written in a document and the same heading drawn on screen are not the same
+   string — one carries the marks, the other has had them turned into shape. Stripped of
+   the marks, they meet. */
+function plainHead(s){
+  return s.replace(/[*`~]/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+          .replace(/\s+/g, " ").trim();
+}
+
+/* The heading the change sits under, found in the document on screen. Headings move and
+   get renamed, so an old one may have no place to land. */
+function headingIn(name){
+  var want = plainHead(name);
+  if(!want) return null;
+  var all = $("doc").querySelectorAll(".md h1, .md h2, .md h3, .md h4");
+  for(var i = 0; i < all.length; i++){
+    if(plainHead(all[i].textContent) === want) return all[i];
+  }
+  return null;
+}
+
+/* A commit message is wrapped short for a terminal, but here the pane decides the width.
+   The lines of a paragraph are joined back so the text fills the pane like the rows under
+   it; a blank line still parts paragraphs, and a line that is indented or starts a list
+   keeps its own break. */
+function reflow(text){
+  return text.split(/\r?\n[ \t]*\r?\n/)
+             .map(function(block){
+               return block.replace(/\r?\n(?![ \t]|[-*•]\s|\d+[.)]\s)/g, " ").trim();
+             })
+             .join("\n\n");
+}
+
+/* Git's diff, read as a list: every line the commit took out and every line it put in,
+   gathered under the heading they sit beneath. The heading is the address — the document
+   is read as a drawn page, where a line number has nothing to point at. */
+function diffToDom(hunks){
+  var out = document.createElement("div");
+  out.className = "diff";
+  hunks.forEach(function(h){
+    var hunk = document.createElement("div");
+    hunk.className = "hunk";
+    var tag = document.createElement("p");
+    tag.className = "sub";
+    tag.textContent = h.head || "top of the document";
+    var there = headingIn(h.head);
+    if(!there && h.head){
+      /* The heading was renamed or taken out later, so there is nowhere to go. Saying so
+         is the point — a heading the document no longer has is itself part of the record. */
+      var gone = document.createElement("span");
+      gone.className = "gone";
+      gone.textContent = "gone";
+      tag.appendChild(gone);
+      hunk.title = "This heading is no longer in the document";
+    }
+    if(there){
+      hunk.className = "hunk go";
+      hunk.title = "Go to this place in the document";
+      hunk.onclick = function(){
+        /* Looked up again: the document pane may hold another document by now. */
+        var el = headingIn(h.head);
+        if(!el) return;
+        el.scrollIntoView({ block: "start" });
+        /* Near the end of a document there is nothing left to scroll, so the heading
+           lands wherever it can. The flash says which one was meant. */
+        el.classList.remove("lit");
+        void el.offsetWidth;
+        el.classList.add("lit");
+      };
+    }
+    hunk.appendChild(tag);
+    h.rows.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "drow " + (r.add ? "add" : "del");
+      if(r.pre) row.appendChild(document.createTextNode(r.pre));
+      if(r.mid){
+        var m = document.createElement("mark");
+        m.textContent = r.mid;
+        row.appendChild(m);
+      }
+      if(r.post) row.appendChild(document.createTextNode(r.post));
+      hunk.appendChild(row);
+    });
+    out.appendChild(hunk);
+  });
+  return out;
+}
+
+/* What a change did to a document, in the words the pane shows. */
+var DID = { A: "added", D: "removed", M: "changed", R: "moved" };
+
+/* Which ask is the live one, so an answer that arrives late is dropped rather than
+   drawn over a newer one — the same rule the search box follows. */
+var drawn2 = 0;
+
+/* The document the box is naming, if it names one. A bare file name is enough while it
+   is the only one with that name; two documents called README.md are told apart by
+   writing the folder in front, the way the search box takes a path. */
+function namedDoc(word){
+  var q = (word || "").trim().toLowerCase();
+  if(!q || !S.cur) return null;
+  var exact = null, sameName = [];
+  S.cur.docs.forEach(function(d){
+    var rel = shortPath(d).toLowerCase();
+    if(rel === q) exact = d;
+    else if(base(rel) === q) sameName.push(d);
+  });
+  return exact || (sameName.length === 1 ? sameName[0] : null);
+}
+
+/* A document is read out of the record, not off the disk. This is the only way to one
+   that is no longer there — nothing is left to open and ask about. */
+function openPast(anchor, c, t){
+  invoke("doc_at", { path: anchor.path, sha: c.sha, was: t.name }).then(function(past){
+    if(!past){ histSay("That version could not be read."); return; }
+    S.at = null;
+    S.past = { sha: c.sha, name: t.name, gone: past.gone };
+    $("docpath").textContent = t.name + "  ·  " + c.sha
+      + (past.gone ? "  ·  as it was before this change" : "");
+    $("mdbody").innerHTML = mdToHtml(past.text);
+    wire(dirOf(t.name));
+    /* Every link is stripped here. The document around it is from another day and its
+       neighbours may have moved since, so following one would quietly land today's
+       document under yesterday's name. */
+    Array.prototype.forEach.call($("mdbody").querySelectorAll("a"), function(a){
+      dead(a, "an older version does not follow links");
+    });
+    $("doc").scrollTop = 0;
+  }).catch(function(){ histSay("That version could not be read."); });
+}
+
+/* One commit, as a row of the list. Built here rather than inside the render so the
+   next page of commits lands in the same shape as the first. */
+function commitRow(anchor, c, whole){
+  var li = document.createElement("li");
+  li.className = "row";
+  li.tabIndex = 0;
+  var head = document.createElement("b");
+  head.textContent = c.subject;
+  var when = document.createElement("span");
+  when.className = "sub";
+  when.textContent = " " + c.sha + " · " + c.when;
+  li.appendChild(head);
+  li.appendChild(when);
+  /* One line of the reason, the way a search hit shows one line of the document.
+     The whole message is there when the version is opened, which has room for it. */
+  if(c.body){
+    var why = document.createElement("div");
+    why.className = "sub";
+    why.textContent = c.body.replace(/\s+/g, " ").slice(0, 110);
+    li.appendChild(why);
+  }
+  /* With the whole project asked for, the documents it touched are the point of the
+     row: each one says what happened to it and opens that version when pressed. */
+  if(whole && c.touched && c.touched.length){
+    var box = document.createElement("div");
+    box.className = "touched";
+    c.touched.forEach(function(t){
+      var one = document.createElement("span");
+      one.className = "one";
+      one.textContent = (DID[t.how] || t.how) + " "
+        + (t.from ? t.from + " → " + t.name : t.name);
+      one.title = "Read " + t.name + " as it was at " + c.sha;
+      one.onclick = function(e){ e.stopPropagation(); openPast(anchor, c, t); };
+      box.appendChild(one);
+    });
+    li.appendChild(box);
+  }
+  li.onclick = function(){ openVersion(anchor, c); };
+  return li;
+}
+
+/* The last row of a full page is the way to the one after it. It is a row like the
+   others so the arrow keys reach it, and it takes its own place when it is used. */
+function more(anchor, ul, skip, whole){
+  var li = document.createElement("li");
+  li.className = "row";
+  li.tabIndex = 0;
+  li.textContent = "older changes";
+  li.onclick = function(){
+    li.textContent = "reading...";
+    li.onclick = null;
+    invoke("doc_log", { path: anchor.path, skip: skip, whole: whole, find: "" })
+      .then(function(list){
+      li.remove();
+      if(!list || !list.length) return;
+      list.forEach(function(c){ ul.appendChild(commitRow(anchor, c, whole)); });
+      if(list.length === 30) more(anchor, ul, skip + 30, whole);
+    }).catch(function(){
+      li.textContent = "those could not be read";
+      li.classList.remove("row");
+    });
+  };
+  ul.appendChild(li);
+}
+
+/* The pane opens on the document being read, because that is the usual question. Empty
+   the box and it widens to the whole project — every change it has, including the ones
+   that took a document away. There is no second control: the box is the whole of it. */
+function showHistory(){
+  $("hist").className = "tab";
+  if(!S.cur || !S.cur.docs.length){ histSay("Nothing here to look back on."); return; }
+  /* Opening another document moves this pane with it — but only while the box is
+     naming a document. A word someone is looking for is theirs, and is left alone. */
+  if(S.at && (!S.find || namedDoc(S.find))) S.find = shortPath(S.at);
+  var box = $("hist").querySelector(".find");
+  if(box && box.value !== S.find) box.value = S.find;
+  drawHistory();
+}
+
+/* The box and the line above it are built once and then left alone. Only the list under
+   them is replaced, so typing never takes the box away from under the hand: no blink,
+   no lost caret, and the word stays where it was typed. */
+function histFrame(){
+  var box = $("hist").querySelector(".find");
+  if(box) return { where: $("hist").querySelector("p.sub"), find: box,
+                   ul: $("hist").querySelector("ul.list") };
+  $("hist").innerHTML = "";
+  $("hist").className = "tab";
+  var where = document.createElement("p");
+  where.className = "sub";
+  $("hist").appendChild(where);
+  var find = document.createElement("input");
+  find.className = "find";
+  find.placeholder = "a document's name, or a word from the record";
+  find.value = S.find || "";
+  $("hist").appendChild(find);
+  var ul = document.createElement("ul");
+  ul.className = "list";
+  $("hist").appendChild(ul);
+  /* The word goes to the record itself, not to the rows already drawn — a document
+     taken away years ago is not among them. Asking on every keystroke would run git
+     for every letter, so the ask waits for the typing to stop. */
+  find.addEventListener("input", function(){
+    S.find = find.value;
+    clearTimeout(S.wait);
+    S.wait = setTimeout(drawHistory, 250);
+  });
+  listKeys(find, ul);
+  return { where: where, find: find, ul: ul };
+}
+
+/* A folder with nothing to look back on is not broken — it simply has no record yet,
+   and the person reading may not know that one is a `git init` away. The row runs when
+   it is pressed: the line is a settled one, not an example to edit, and the person who
+   pressed it asked for exactly it. Nothing here happens unpressed. */
+function startRow(){
+  /* One line rather than three, because a newline is an Enter and three lines would run
+     two of them on the way to the third. `;` and not `&&`, which the shell behind the
+     tab on Windows has no sense of. `-b main` names the first branch instead of taking
+     whatever this installation of git happens to default to, and the message is the one
+     the places people meet git first write for them. */
+  var body = 'git init -b main; git add -A; git commit -m "Initial commit"';
+  var li = document.createElement("li");
+  li.className = "cmd";
+  var what = document.createElement("span");
+  what.className = "what";
+  what.textContent = "Start a record in this folder";
+  what.title = body;
+  var run = document.createElement("button");
+  run.innerHTML = icon("play");
+  /* The same words as every other one of these buttons that runs what it types: one
+     button saying two things is how a press stops being predictable. */
+  run.title = "type it into the terminal and run it";
+  run.onclick = function(){ runCommand(body, true); };
+  var copy = document.createElement("button");
+  copy.innerHTML = icon("copy");
+  copy.title = "copy";
+  copy.onclick = function(){ copyText(body, this); };
+  li.appendChild(what);
+  li.appendChild(run);
+  li.appendChild(copy);
+  return li;
+}
+
+/* Only worth offering when git is there to run it. Asked once and kept, because the
+   answer cannot change while the window is open. */
+var hasGit = null;
+function gitHere(){
+  if(hasGit) return hasGit;
+  hasGit = invoke("about").then(function(a){ return !!(a && a.git); }).catch(function(){ return false; });
+  return hasGit;
+}
+
+function drawHistory(){
+  var only = namedDoc(S.find);
+  var whole = !only;
+  var word = whole ? (S.find || "").trim() : "";
+  var anchor = only || (S.at && S.cur.docs.indexOf(S.at) >= 0 ? S.at : S.cur.docs[0]);
+  var mine = S.cur;
+  var asked = ++drawn2;
+  var frame = $("hist").querySelector(".find") ? null : histFrame();
+  if(frame) frame.where.textContent = "Reading the record...";
+  /* The line over the box names the branch. It used to repeat whatever the box held,
+     which told the reader nothing the box was not already saying, while the one thing
+     the pane could not say was which line of work the record belongs to. */
+  invoke("branch", { path: anchor.path }).then(function(name){
+    if(asked !== drawn2 || S.cur !== mine) return;
+    var line = $("hist").querySelector("p.sub");
+    if(line) line.textContent = name || "";
+  }).catch(function(){});
+  invoke("doc_log", { path: anchor.path, skip: 0, whole: whole, find: word })
+    .then(function(list){
+    /* A word typed while git was answering has its own ask on the way. */
+    if(asked !== drawn2) return;
+    /* Another project may have been picked while git was answering. */
+    if(S.cur !== mine) return;
+    if(!list){
+      gitHere().then(function(ok){
+        if(asked !== drawn2 || S.cur !== mine) return;
+        histSay(ok ? "No record here yet. This folder is not a repository."
+                   : "No record here. git is not installed, so there is nothing to read.");
+        if(!ok) return;
+        var ul = document.createElement("ul");
+        ul.className = "list";
+        ul.appendChild(startRow());
+        $("hist").appendChild(ul);
+      });
+      return;
+    }
+    var f = histFrame();
+    var said = $("hist").querySelector("p.empty");
+    if(said) said.remove();
+    f.ul.innerHTML = "";
+    if(!list.length){
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = word
+        ? "No change in the record says that, and no document by that name was ever here."
+        : "Nothing in the record touches this yet.";
+      $("hist").appendChild(none);
+    }
+    list.forEach(function(c){ f.ul.appendChild(commitRow(anchor, c, whole)); });
+    /* Thirty is what one ask brings back. A full page means there is likely another,
+       and the next one lands under this one rather than replacing it. A word's answer
+       is the thirty most recent and is not paged: narrow the word instead. */
+    if(list.length === 30 && !word) more(anchor, f.ul, 30, whole);
+  }).catch(function(){ histSay("The record could not be read."); });
+}
+
+/* One change, as it fell on one document. `was` names which document — a change that
+   touched several is read one at a time, and the names of the others stand at the top. */
+function openVersion(anchor, c, was){
+  var mine = S.cur;
+  var name = was || c.name;
+  invoke("doc_diff", { path: anchor.path, sha: c.sha, was: name }).then(function(hunks){
+    if(S.cur !== mine) return;
+    if(!hunks){ histSay("That change could not be read."); return; }
+    $("hist").innerHTML = "";
+    /* The way back and the stamp share a line: the mark is as tall as a line of text
+       anyway, so a line of its own would be a line spent on nothing. */
+    var head = document.createElement("div");
+    head.className = "verline";
+    /* One step back, and only inside this pane. The document pane never moves. */
+    var back = document.createElement("button");
+    back.className = "back";
+    back.innerHTML = icon("back");
+    back.title = "back to the list";
+    back.onclick = function(){ showHistory(); };
+    head.appendChild(back);
+    var when = document.createElement("span");
+    when.className = "sub";
+    when.textContent = c.sha + "  ·  " + c.when;
+    head.appendChild(when);
+    $("hist").appendChild(head);
+    var title = document.createElement("p");
+    title.className = "subject";
+    title.textContent = c.subject;
+    $("hist").appendChild(title);
+    /* The documents this change touched. The one on screen is marked; the others are a
+       press away, and each name also opens that document as it stood here. */
+    if(c.touched && c.touched.length){
+      var box = document.createElement("div");
+      box.className = "touched";
+      c.touched.forEach(function(t){
+        var one = document.createElement("span");
+        one.className = "one" + (t.name === name ? " on" : "");
+        one.textContent = (DID[t.how] || t.how) + " "
+          + (t.from ? t.from + " → " + t.name : t.name);
+        one.title = t.name === name
+          ? "Read it as it was at " + c.sha
+          : "The change to " + t.name;
+        one.onclick = t.name === name
+          ? function(){ openPast(anchor, c, t); }
+          : function(){ openVersion(anchor, c, t.name); };
+        box.appendChild(one);
+      });
+      $("hist").appendChild(box);
+    }
+    /* The whole message, not a line of it. The reader came here for the reason, and this
+       is the only place it is written down. */
+    if(c.body){
+      var why = document.createElement("p");
+      why.className = "why";
+      why.textContent = reflow(c.body);
+      $("hist").appendChild(why);
+    }
+    var rows = diffToDom(hunks);
+    if(!rows.children.length){
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = "Nothing changed in that document here.";
+      $("hist").appendChild(none);
+    }else{
+      $("hist").appendChild(rows);
+    }
+  }).catch(function(){ histSay("That change could not be read."); });
+}
+
+function showTab(name){
+  Array.prototype.forEach.call($("tabs").children, function(b){
+    b.className = b.getAttribute("data-tab") === name ? "on" : "";
+  });
+  Array.prototype.forEach.call($("center").querySelectorAll(".tab"), function(el){
+    el.hidden = el.getAttribute("data-tab") !== name;
+  });
+  if(name === "search") $("search").focus();
+  if(name === "term") openTerm().catch(function(){});
+  if(name === "hist") showHistory();
+}
+Array.prototype.forEach.call($("tabs").children, function(b){
+  b.onclick = function(){ showTab(b.getAttribute("data-tab")); };
+});
+
+/* The mouse is the first way through this screen and stays that way. This is the second
+   one: with a hand already on the keys, the arrows walk the list under the box, Enter
+   opens what is marked, and Escape empties the box. Tab reaches the rows themselves,
+   because a row that can be clicked should be reachable without the mouse. */
+function listKeys(input, box){
+  function rows(){ return Array.prototype.slice.call(box.querySelectorAll("li.row")); }
+  function mark(i){
+    var r = rows();
+    if(!r.length) return;
+    i = i < 0 ? 0 : (i >= r.length ? r.length - 1 : i);
+    r.forEach(function(li){ li.classList.remove("pick"); });
+    r[i].classList.add("pick");
+    r[i].scrollIntoView({ block: "nearest" });
+  }
+  input.addEventListener("keydown", function(e){
+    var r = rows(), at = r.indexOf(box.querySelector("li.pick"));
+    if(e.key === "ArrowDown"){ e.preventDefault(); mark(at + 1); return; }
+    if(e.key === "ArrowUp"){ e.preventDefault(); mark(at - 1); return; }
+    if(e.key === "Enter"){ if(r.length) (at < 0 ? r[0] : r[at]).click(); return; }
+    if(e.key === "Escape"){
+      input.value = "";
+      input.dispatchEvent(new Event("input"));
+    }
+  });
+  /* A row the tab key has landed on answers to Enter and to the space bar, the way a
+     button does. The handler sits on the box so rows drawn later are covered too. */
+  box.addEventListener("keydown", function(e){
+    var li = e.target;
+    if(!li || !li.classList || !li.classList.contains("row")) return;
+    if(e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    li.click();
+  });
+}
+
+/* The menu the webview puts under the right button is a browser's menu: back, reload,
+   save as, print, inspect. This screen is none of those things — it has no address to go
+   back to and nothing here is a page to save — and offering them says it is. The
+   terminal keeps its own right button, which pastes, and that handler runs first. */
+/* The window follows the system's light or dark, and the stylesheet does that on its
+   own. These two do not: the terminal keeps its colours in an option, and a diagram is
+   a picture that was drawn once. Both are redone when the system changes. */
+if(window.matchMedia){
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){
+    Object.keys(TERMS).forEach(function(k){
+      var one = TERMS[k];
+      if(one.term){
+        one.term.options.theme = { background: paint("--bg"), foreground: paint("--term-fg"),
+                                   cursor: paint("--term-cursor") };
+      }
+    });
+    if(S.at) openDoc(S.at);
+  });
+}
+
+document.addEventListener("contextmenu", function(e){
+  /* Only once a shell is there to paste into: before that the pane is empty and the
+     browser's menu would be the only thing the right button did. */
+  if(termWired && $("term").contains(e.target)) return;
+  e.preventDefault();
+});
+
+$("search").addEventListener("input", function(){ runSearch(this.value.trim()); });
+listKeys($("search"), $("hits"));
+/* Which word the pane is showing. A search started earlier can land later — the first
+   one has to read every document off disk while the next already has them in hand — and
+   without this the older answer would draw over the newer one. */
+var asked = "";
+
+function runSearch(q){
+  var box = $("hits");
+  box.innerHTML = "";
+  $("hitcount").textContent = "";
+  asked = q;
+  if(q.length < 2) return;
+  var all = [];
+  S.projects.forEach(function(p){
+    p.docs.forEach(function(d){ all.push({ p: p, d: d }); });
+  });
+  var needle = q.toLowerCase();
+  Promise.all(all.map(function(x){
+    return textOf(x.d).catch(function(){ return ""; });
+  })).then(function(texts){
+    if(asked !== q) return;
+    /* The path is searched beside the body. The screen holds no file list, so a
+       document whose name you remember but whose words you do not would have no
+       other way in. A name match stands first: typing a name says which file. */
+    var hits = [];
+    texts.forEach(function(t, i){
+      var named = all[i].d.path.toLowerCase().indexOf(needle) >= 0;
+      var at = t.toLowerCase().indexOf(needle);
+      if(!named && at < 0) return;
+      hits.push({ x: all[i], text: t, at: at, named: named });
+    });
+    hits.sort(function(a, b){ return (b.named ? 1 : 0) - (a.named ? 1 : 0); });
+    hits.slice(0, 30).forEach(function(h){
+      var li = document.createElement("li");
+      li.className = "row";
+      li.tabIndex = 0;
+      var head = document.createElement("b");
+      head.textContent = base(h.x.d.path);
+      var where = document.createElement("span");
+      where.className = "sub";
+      where.textContent = " " + h.x.p.name;
+      var snip = document.createElement("div");
+      snip.className = "sub";
+      snip.textContent = h.named || h.at < 0
+        ? h.x.d.path
+        : h.text.slice(Math.max(0, h.at - 40), h.at + 70).replace(/\s+/g, " ");
+      li.appendChild(head); li.appendChild(where); li.appendChild(snip);
+      li.onclick = function(){
+        if(S.cur !== h.x.p) pickProject(S.projects.indexOf(h.x.p));
+        openDoc(h.x.d, q);
+      };
+      box.appendChild(li);
+    });
+    var shown = Math.min(hits.length, 30);
+    $("hitcount").textContent = shown ? shown + (hits.length > 30 ? "+" : "") + " hits" : "no match";
+  });
+}
+
+/* The panes are dragged by strips laid over the grid gaps. A gap is one pixel wide,
+   which is too thin to catch, so the strips are wider than what they sit on. */
+var PANES = "refdex-panes";
+function tracks(prop){
+  return getComputedStyle($("app"))[prop].split(" ").map(parseFloat);
+}
+/* Reads one of the pane variables off the stylesheet, so the numbers live in one
+   place and the script does not carry a second copy of them. */
+function pxVar(name){
+  return parseFloat(getComputedStyle($("app")).getPropertyValue(name)) || 0;
+}
+function setPane(name, px){
+  $("app").style.setProperty(name, px + "px");
+}
+function layout(){
+  if($("app").hidden) return;
+  var box = $("app").getBoundingClientRect();
+  var cols = tracks("gridTemplateColumns");
+  var rows = tracks("gridTemplateRows");
+  var a = $("gripA"), b = $("gripB"), c = $("gripC");
+  a.style.left = (cols[0] - 3) + "px"; a.style.top = "0"; a.style.height = box.height + "px";
+  b.style.left = (cols[0] + cols[1] - 2) + "px"; b.style.top = "0"; b.style.height = box.height + "px";
+  c.style.top = (rows[0] - 3) + "px"; c.style.left = "0"; c.style.width = cols[0] + "px";
+}
+function savePanes(){
+  var cols = tracks("gridTemplateColumns");
+  var rows = tracks("gridTemplateRows");
+  try {
+    localStorage.setItem(PANES, JSON.stringify({ c1: cols[0], c2: cols[1], r1: rows[0] }));
+  } catch(e) { /* storage turned off; the panes just start at their defaults */ }
+}
+/* A saved size that cannot be read must not keep the app from opening. */
+function loadPanes(){
+  try {
+    var v = JSON.parse(localStorage.getItem(PANES) || "null");
+    if(v){
+      if(v.c1 > 0) setPane("--c1", v.c1);
+      if(v.c2 > 0) setPane("--c2", v.c2);
+      if(v.r1 > 0) setPane("--r1", v.r1);
+    }
+  } catch(e) { }
+  fitPanes();
+}
+
+/* Sizes are kept in pixels, so a layout saved on a big window can be bigger than the
+   window it is read back into. Left alone it pushes a pane out of the frame and takes
+   the boundary that would bring it back with it. Both axes, for the same reason. */
+function fitPanes(){
+  if($("app").hidden) return;
+  var box = $("app").getBoundingClientRect();
+  if(box.width <= 0 || box.height <= 0) return;
+  /* The gaps between the panes take room the tracks cannot have. Leaving them out of
+     the sum puts the last pane a couple of pixels past the edge. */
+  var gaps = getComputedStyle($("app"));
+  var wide = box.width - (parseFloat(gaps.columnGap) || 0) * 2;
+  var tall = box.height - (parseFloat(gaps.rowGap) || 0);
+  var cols = tracks("gridTemplateColumns");
+  var lo = pxVar("--min-left"), mid = pxVar("--min-mid"), doc = pxVar("--min-doc");
+  var c1 = clamp(cols[0], lo, Math.max(lo, wide - mid - doc));
+  var c2 = clamp(cols[1], mid, Math.max(mid, wide - c1 - doc));
+  setPane("--c1", c1);
+  setPane("--c2", c2);
+  var row = pxVar("--min-row");
+  setPane("--r1", clamp(tracks("gridTemplateRows")[0], row, Math.max(row, tall - row)));
+}
+function grip(el, move){
+  el.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    var box = $("app").getBoundingClientRect();
+    var onMove = function(ev){ move(ev, box); layout(); };
+    var onUp = function(ev){
+      el.releasePointerCapture(ev.pointerId);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      savePanes();
+      if(!$("term").hidden && termNow() && termNow().fit) termNow().fit.fit();
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+  });
+}
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+
+grip($("gripA"), function(ev, box){
+  var cols = tracks("gridTemplateColumns");
+  /* The two left panes share what they had: this boundary moves width between them
+     and leaves the document pane where it is. */
+  var pair = cols[0] + cols[1];
+  var lo = pxVar("--min-left"), mid = pxVar("--min-mid");
+  var c1 = clamp(ev.clientX - box.left, lo, Math.max(lo, pair - mid));
+  setPane("--c1", c1);
+  setPane("--c2", pair - c1);
+});
+grip($("gripC"), function(ev, box){
+  var row = pxVar("--min-row");
+  setPane("--r1", clamp(ev.clientY - box.top, row, Math.max(row, box.height - row)));
+});
+grip($("gripB"), function(ev, box){
+  var cols = tracks("gridTemplateColumns");
+  var wide = ev.clientX - box.left - cols[0];
+  var mid = pxVar("--min-mid"), doc = pxVar("--min-doc");
+  setPane("--c2", clamp(wide, mid, Math.max(mid, box.width - cols[0] - doc)));
+});
+window.addEventListener("resize", function(){
+  fitPanes();
+  layout();
+  if(!$("term").hidden && termNow() && termNow().fit) termNow().fit.fit();
+});
+loadPanes();
+</script>
+</body>
+</html>

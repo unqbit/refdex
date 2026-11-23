@@ -1,0 +1,2 @@
+# 셸 스크립트와 유닛은 Windows에서도 LF를 유지한다
+* text=auto eol=lf

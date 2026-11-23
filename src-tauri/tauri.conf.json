@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Refdex",
+  "identifier": "local.refdex",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://refdex.localhost; img-src 'self' http://refdex.localhost data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; frame-src http://refdex.localhost; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "dangerousDisableAssetCspModification": ["style-src"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "publisher": "Refdex",
+    "windows": {
+      "wix": {
+        "language": ["en-US"],
+        "bannerPath": "icons/installer-banner.bmp",
+        "dialogImagePath": "icons/installer-dialog.bmp"
+      }
+    }
+  }
+}
